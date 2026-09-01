@@ -1,0 +1,12 @@
+mutation ProductUpdateTitle($id: ID!, $title: String!) {
+  productUpdate(input: { id: $id, title: $title }) {
+    product {
+      id
+      title
+    }
+    userErrors {
+      field
+      message
+    }
+  }
+}

@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Real per-brand credentials (config/stores/<Brand>.json.example templates stay committed)
+config/stores/*.json
+
+# Exports (per-brand subfolders), gitignored (contains PII)
+output/*
+!output/.gitkeep

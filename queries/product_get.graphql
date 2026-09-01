@@ -1,0 +1,40 @@
+query ProductGet($id: ID!) {
+  product(id: $id) {
+    id
+    title
+    handle
+    descriptionHtml
+    vendor
+    productType
+    status
+    tags
+    totalInventory
+    onlineStoreUrl
+    featuredImage {
+      url
+      altText
+    }
+    images(first: 20) {
+      edges {
+        node {
+          url
+          altText
+        }
+      }
+    }
+    variants(first: 50) {
+      edges {
+        node {
+          id
+          title
+          sku
+          price
+          compareAtPrice
+          inventoryQuantity
+        }
+      }
+    }
+    createdAt
+    updatedAt
+  }
+}

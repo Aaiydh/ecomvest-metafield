@@ -1,0 +1,43 @@
+query Products($cursor: String) {
+  products(first: 50, after: $cursor) {
+    edges {
+      node {
+        id
+        title
+        handle
+        vendor
+        productType
+        status
+        tags
+        totalInventory
+        priceRangeV2 {
+          minVariantPrice {
+            amount
+            currencyCode
+          }
+          maxVariantPrice {
+            amount
+            currencyCode
+          }
+        }
+        variants(first: 50) {
+          edges {
+            node {
+              id
+              title
+              sku
+              price
+              inventoryQuantity
+            }
+          }
+        }
+        createdAt
+        updatedAt
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}

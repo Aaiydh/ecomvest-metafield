@@ -1,0 +1,7 @@
+{
+  "shop": "xxxxxx-x.myshopify.com",
+  "client_id": "<client id from the app's API credentials>",
+  "client_secret": "<client secret from the app's API credentials>",
+  "auth_code": "",
+  "token": ""
+}
