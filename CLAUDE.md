@@ -100,6 +100,13 @@ re-reading why they're there:
   this code. `_write_category_metafields` resolves/submits every attribute
   independently so one such rejection never discards a product's other valid
   writes (see `resolution_errors`/`userErrors` in its return value).
+- **A metafield write can also fail with "This metafield is connected to an
+  option. To make changes, edit the option."** — a different, unrelated
+  rejection seen on products where a merchant has linked a category metafield
+  (commonly Color) to one of the product's variant options for swatch
+  display. Also handled by the same independent-per-attribute resolution -
+  not fixable via `metafieldsSet` at all; would need a product-option
+  mutation instead, which this codebase doesn't implement.
 
 **`suggest_category_metafields()`** is a deliberately small, deterministic
 keyword-rule engine (title/description/tags/variant options → high-confidence

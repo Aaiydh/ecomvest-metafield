@@ -372,18 +372,26 @@ def find_correct_category(cache: MetafieldCache, product_type: str):
     return None, f"ambiguous taxonomy match for '{last}' ({len(exact_leaf)} candidates)"
 
 
-def batch_fix(cl, limit: int, apply: bool = False):
+def batch_fix(cl, limit: int = None, apply: bool = False, on_result=None, skip_ids: set = None):
     """
-    Walk the first `limit` products in the store: fix a grossly mismatched
-    category (only when confidently resolvable to a single taxonomy leaf),
-    then run the deterministic suggest_category_metafields() rules and
-    (if apply) write them. Returns a list of per-product result dicts.
+    Walk the first `limit` products in the store (or every product if `limit`
+    is None/0): fix a grossly mismatched category (only when confidently
+    resolvable to a single taxonomy leaf), then run the deterministic
+    suggest_category_metafields() rules and (if apply) write them. Returns a
+    list of per-product result dicts. If given, `on_result(count, row)` is
+    called after each *newly processed* product - useful for progress
+    reporting on a long run. `skip_ids`, if given, are product GIDs already
+    handled in a prior run of this same batch (e.g. one that crashed midway)
+    - they're skipped entirely, not counted against `limit`, and never
+    trigger `on_result`.
     """
     cache = MetafieldCache(cl)
     results = []
     count = 0
     for node in cl.paginate(PRODUCT_IDS_QUERY, {}, ["products"]):
-        if count >= limit:
+        if skip_ids and node["id"] in skip_ids:
+            continue
+        if limit and count >= limit:
             break
         count += 1
         product_id = node["id"]
@@ -432,6 +440,8 @@ def batch_fix(cl, limit: int, apply: bool = False):
         except Exception as e:
             row["error"] = str(e)
         results.append(row)
+        if on_result:
+            on_result(count, row)
     return results
 
 

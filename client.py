@@ -106,6 +106,9 @@ class ShopifyClient:
                 json={"query": query, "variables": variables or {}},
                 timeout=60,
             )
+            if resp.status_code in (502, 503, 504) and attempt < max_retries:
+                time.sleep(min(2 ** attempt, 16))
+                continue
             resp.raise_for_status()
             payload = resp.json()
             if "errors" in payload:

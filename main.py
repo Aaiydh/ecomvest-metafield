@@ -10,6 +10,14 @@ from urllib.parse import urlparse, parse_qs
 import client as shopify
 import category_metafields
 
+# Product titles/descriptions can contain characters the Windows console's
+# codepage can't encode (seen: a UnicodeEncodeError mid-way through a long
+# batch run, killing an otherwise-successful multi-hour job over a single
+# print statement). Never let output formatting crash real work.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(errors="replace")
+
 QUERIES_DIR = Path(__file__).parent / "queries"
 OUTPUT_DIR = Path(__file__).parent / "output"
 
@@ -232,7 +240,42 @@ def cmd_set_category_metafields(args):
 
 def cmd_batch_fix_categories(args):
     cl = shopify.ShopifyClient(args.store)
-    results = category_metafields.batch_fix(cl, args.limit, apply=args.apply)
+    limit = args.limit if args.limit > 0 else None
+
+    output_path = Path(args.output or _store_output(args.store, "category_batch_report.json"))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    jsonl_path = output_path.with_suffix(".jsonl")
+
+    previous_results = []
+    skip_ids = set()
+    if jsonl_path.exists() and not args.restart:
+        with jsonl_path.open(encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                row = json.loads(line)
+                previous_results.append(row)
+                skip_ids.add(row["id"])
+        if previous_results:
+            print(f"Resuming: {len(previous_results)} products already done in a prior run, skipping those.")
+
+    jsonl_file = jsonl_path.open("a" if previous_results else "w", encoding="utf-8")
+
+    def _progress(count, row):
+        jsonl_file.write(json.dumps(row) + "\n")
+        jsonl_file.flush()
+        if count % 25 == 0:
+            print(f"...{count} newly processed... last: {row.get('title')!r}", flush=True)
+
+    try:
+        new_results = category_metafields.batch_fix(
+            cl, limit, apply=args.apply, on_result=_progress, skip_ids=skip_ids
+        )
+    finally:
+        jsonl_file.close()
+
+    results = previous_results + new_results
 
     fixed = [r for r in results if r.get("category_fixed")]
     mismatched_unresolved = [r for r in results if r.get("category_mismatch_unresolved") or r.get("category_would_fix_to")]
@@ -271,7 +314,7 @@ def cmd_batch_fix_categories(args):
         for r in errors:
             print(f"  {r['id']}  {r.get('title')!r}: {r['error']}")
 
-    _write_output(results, args.output or _store_output(args.store, "category_batch_report.json"))
+    _write_output(results, str(output_path))
 
 
 def cmd_query(args):
@@ -355,9 +398,10 @@ def main():
         help="Batch: fix grossly mismatched categories + apply deterministic category metafield suggestions",
     )
     p.add_argument("--store", required=True)
-    p.add_argument("--limit", type=int, default=50, help="Number of products to process (default: 50)")
+    p.add_argument("--limit", type=int, default=50, help="Number of products to process, or 0 for the whole store (default: 50)")
     p.add_argument("--apply", action="store_true", help="Write changes; without this it's a dry run")
     p.add_argument("--output", help="Where to save the JSON report (default: output/<Brand>/category_batch_report.json)")
+    p.add_argument("--restart", action="store_true", help="Ignore any prior incomplete run and start over from the beginning")
     p.set_defaults(func=cmd_batch_fix_categories)
 
     p = sub.add_parser("query", help="Run an arbitrary .graphql file (read or mutation)")
