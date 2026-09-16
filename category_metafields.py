@@ -484,6 +484,23 @@ PATTERN_KEYWORDS = [
 
 SIZE_ORDER = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL", "3XL", "4XL"]
 
+# Value names too generic/ambiguous to safely auto-match against free text
+# (e.g. "Other" would spuriously match the word "other" in any sentence).
+_GENERIC_VALUE_NAMES = {"other", "none", "n/a", "universal", "all ages"}
+
+
+def _matches_from_values(haystack: str, value_names) -> list:
+    """Whole-word, case-insensitive match of a category attribute's own
+    value names against free text - e.g. "Polyester" literally appearing in
+    a description. Skips generic/ambiguous value names."""
+    matches = []
+    for name in value_names:
+        if name.strip().lower() in _GENERIC_VALUE_NAMES:
+            continue
+        if re.search(r"\b" + re.escape(name.lower()) + r"\b", haystack):
+            matches.append(name)
+    return matches
+
 
 def _haystack(product: dict) -> str:
     text = " ".join(filter(None, [
@@ -500,7 +517,8 @@ def suggest_category_metafields(product: dict) -> tuple:
     if category is None:
         raise ValueError("Product has no category assigned.")
 
-    attr_names = {n["name"] for n in category["attributes"]["nodes"]}
+    attrs_by_name = _choice_list_attributes(category)
+    attr_names = set(attrs_by_name.keys())
     haystack = _haystack(product)
     suggestions = {}
 
@@ -527,6 +545,31 @@ def suggest_category_metafields(product: dict) -> tuple:
             if kw in haystack:
                 suggestions["Color"] = [val]
                 break
+
+    if "Color" not in suggestions and "Color" in attrs_by_name:
+        # Safer than free-text matching: a variant option literally named
+        # Color/Colour/Farbe whose value matches a standard taxonomy color
+        # name exactly (case-insensitive) is structural, not prose-based.
+        color_names_lower = {name.lower(): name for name in attrs_by_name["Color"]}
+        variant_colors = []
+        for edge in product.get("variants", {}).get("edges", []):
+            for opt in edge["node"].get("selectedOptions", []):
+                if opt["name"].strip().lower() not in ("color", "colour", "farbe"):
+                    continue
+                match = color_names_lower.get(opt["value"].strip().lower())
+                if match and match not in variant_colors:
+                    variant_colors.append(match)
+        if variant_colors:
+            suggestions["Color"] = variant_colors
+
+    if "Fabric" in attrs_by_name:
+        matches = _matches_from_values(haystack, attrs_by_name["Fabric"].keys())
+        if matches:
+            suggestions["Fabric"] = matches
+
+    if "Top length type" in attrs_by_name and "Crop top" in attrs_by_name["Top length type"]:
+        if "crop" in haystack:
+            suggestions["Top length type"] = ["Crop top"]
 
     if "Size" in attr_names:
         sizes = set()
