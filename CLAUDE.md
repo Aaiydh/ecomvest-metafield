@@ -86,9 +86,13 @@ re-reading why they're there:
   `_normalize_size_code()` collapses both styles before comparing.
 - **Enabling a standard metafield definition doesn't seed its metaobjects** —
   `standardMetafieldDefinitionEnable` can succeed while the corresponding
-  `shopify--<key>` metaobjects still don't exist yet (observed with "Outsole
-  material"); that attribute stays unwritable via API until someone picks a
-  value for it once through the Admin UI.
+  `shopify--<key>` metaobjects still don't exist yet. Confirmed on two
+  unrelated shop/attribute pairs so far (TomHollinger's "Outsole material",
+  Vinthentic's "Eyewear frame material" *and* its own pre-existing "Color"
+  missing a "Clear" entry) — this looks like general Shopify behavior, not a
+  one-off: a value only gets its metaobject once *some* product on that shop
+  has had it picked through the Admin UI at least once. That attribute/value
+  stays unwritable via API until someone does that once.
 - **A metafield write can fail with "Owner subtype does not match the
   metafield definition's constraints"** for non-apparel products (seen on
   smartwatches/calendars) even though the category's attribute list appears
